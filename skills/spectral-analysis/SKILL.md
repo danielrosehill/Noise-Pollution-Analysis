@@ -23,36 +23,58 @@ the user gives.
 
 ## Requirements
 
-`uv` and `ffmpeg` on PATH. The script declares its own Python dependencies (numpy,
-scipy, soundfile, matplotlib); `uv run` installs them in an isolated environment.
+`ffmpeg`, `sox` and `uv` (core), `aubio` (recommended). If any core tool is missing, run
+`install-analysis-tools` first. Commands, versions and test results:
+`${CLAUDE_PLUGIN_ROOT}/references/toolchain.md`.
 
 ## Steps
 
-1. Run the analysis script, output into the sample's `analysis/` folder (or a folder
-   next to the file for a bare path):
+1. **Probe** the file with `ffprobe` (codec, sample rate, duration) and note lossy
+   formats or sample rates under 44.1 kHz. Work in `<sample>/analysis/` (or a folder next
+   to a bare file). If the file is not WAV or FLAC, decode it once and use the WAV as
+   `<rec>` for sox and aubio (sox can't tell the length of an m4a, which spoils its plots):
+   `ffmpeg -v error -i "<file>" -c:a pcm_s24le "<out>/decoded.wav"`
+2. **Spectrograms from the CLIs**, so you can see the nuisance before measuring it:
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/scripts/analyse_noise.py" "<recording>" \
-     --out "<sample>/analysis" [--background "<bg>"] [--start S --end S] [--calibration-offset DB]
+   ffmpeg -v error -y -i "<rec>" -lavfi "showspectrumpic=s=1200x512:mode=combined:scale=log:fscale=log:legend=1" "<out>/cli_spec_full.png"
+   sox "<rec>" -n remix - rate 2k spectrogram -x 1200 -y 513 -z 80 -t "0-1 kHz" -o "<out>/cli_spec_1k.png"
+   sox "<rec>" -n remix - rate 500 spectrogram -x 1200 -y 513 -z 80 -t "0-250 Hz" -o "<out>/cli_spec_250.png"
+   ```
+   Read the PNGs as images. Note steady horizontal lines (tones and hums), lines that come
+   and go (cycling machinery), vertical stripes (impacts), and handling noise at the ends
+   of the take to exclude with `--start`/`--end` in step 4.
+3. **Time-domain events with aubio** (skip if aubio is missing and say so in the report):
+   ```bash
+   aubio onset -i "<rec>" -m specflux -t 0.3 > "<out>/onsets.txt"       # impact times (s)
+   aubio pitch -i "<rec>" -m yin -u Hz -B 4096 -H 1024 > "<out>/pitch.txt"  # time, Hz
+   ```
+   Onsets at regular intervals mean rhythmic impacts (footsteps, bass beat, machinery).
+   For pitch, summarise the stable values (ignore 0 and isolated jumps). A tone that holds
+   steady is fixed-speed machinery or mains hum; one that drifts is variable-speed.
+4. **Measurements** with the plugin's script: spectrum, 1/3 octaves (unweighted and
+   A-weighted), tonal peaks, harmonic families, envelope periodicity, background excess:
+   ```bash
+   uv run "${CLAUDE_PLUGIN_ROOT}/scripts/analyse_noise.py" "<rec>" \
+     --out "<out>" [--background "<bg>"] [--start S --end S] [--calibration-offset DB]
    ```
    If `CLAUDE_PLUGIN_ROOT` is unset (skill read outside an installed plugin), run it
-   straight from GitHub:
+   from GitHub:
    `uv run https://raw.githubusercontent.com/danielrosehill/Noise-Pollution-Analysis/main/scripts/analyse_noise.py ...`
-   The script prints a short JSON summary; the full numbers are in `analysis/analysis.json`.
-2. Look at `analysis/spectrogram_lf.png` and `analysis/spectrum.png` (Read them as images)
-   to confirm what the numbers say, e.g. whether a tone is steady or comes and goes, and
-   whether energy at one moment is a handling thump rather than the nuisance. If a
-   span is contaminated, re-run with `--start`/`--end`.
-3. Interpret with `${CLAUDE_PLUGIN_ROOT}/references/frequency-interpretation.md`:
+   The full numbers go to `<out>/analysis.json`. Cross-check them against what steps 2
+   and 3 showed. If they disagree, look again before reporting.
+5. **Isolation** (optional): if a background take exists and the user wants to hear the
+   nuisance on its own, run `isolate-nuisance`.
+6. Interpret with `${CLAUDE_PLUGIN_ROOT}/references/frequency-interpretation.md`:
    character (tonal, harmonic, cyclic, impulsive, broadband, low-frequency), likely
    source mechanisms for the measured frequencies, and the caveats that apply. Use the
    source description in `sources/<slug>/source.md` ("cycles every few minutes",
    "worse with windows closed") to support or question the match.
-4. Write `report.md` in the sample folder (template below). Every frequency claim cites a
+7. Write `report.md` in the sample folder (template below). Every frequency claim cites a
    number from `analysis.json`. Mark interpretations as such.
-5. Set `analysed: true` in `sample.md`. If the source has two or more analysed samples,
+8. Set `analysed: true` in `sample.md`. If the source has two or more analysed samples,
    offer to write or update `reports/<YYYY-MM-DD>_<source-slug>_summary.md` comparing
    them (consistent peaks across samples and rooms are the strongest evidence).
-6. Tell the user the 2-3 headline findings and the report path.
+9. Tell the user the 2-3 headline findings and the report path.
 
 ## Report template
 
@@ -73,7 +95,7 @@ scipy, soundfile, matplotlib); `uv run` installs them in an isolated environment
 |---|---|---|---|
 
 ## Character
-Tonality, harmonic families, periodicity, L10/L50/L90 spread, crest factor.
+Tonality, harmonic families, pitch stability (aubio), impact timing (aubio onsets), periodicity, L10/L50/L90 spread, crest factor.
 
 ## Weighted vs unweighted
 Loudest 1/3-octave band unweighted vs A-weighted; what A-weighting hides here.
@@ -87,7 +109,8 @@ Two or three lines pointing to the mitigation class the profile suits.
 
 ## Figures
 ![Spectrum](analysis/spectrum.png) ![1/3 octaves](analysis/thirds.png)
-![Spectrogram 0-500 Hz](analysis/spectrogram_lf.png) ![Level over time](analysis/level_time.png)
+![Spectrogram full range](analysis/cli_spec_full.png) ![Spectrogram 0-1 kHz](analysis/cli_spec_1k.png)
+![Spectrogram 0-250 Hz](analysis/cli_spec_250.png) ![Level over time](analysis/level_time.png)
 ```
 
 ## Notes

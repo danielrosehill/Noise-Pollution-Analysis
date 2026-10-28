@@ -1,12 +1,22 @@
 {
   "name": "noise-pollution-analysis",
-  "version": "0.1.0",
-  "description": "Document indoor noise pollution and analyse recordings at the frequency level: hums, tones, low-frequency drone, cycling, with reports per sample.",
+  "version": "0.2.0",
+  "description": "Document indoor noise pollution and analyse recordings with ffmpeg, sox and aubio: hums, tones, drone, impacts, isolation from background.",
   "author": {
     "name": "Daniel Rosehill",
     "url": "https://github.com/danielrosehill"
   },
   "repository": "https://github.com/danielrosehill/Noise-Pollution-Analysis",
   "license": "MIT",
-  "keywords": ["noise", "noise-pollution", "acoustics", "spectral-analysis", "low-frequency-noise", "audio", "ffmpeg"]
+  "keywords": [
+    "acoustics",
+    "aubio",
+    "audio",
+    "ffmpeg",
+    "low-frequency-noise",
+    "noise",
+    "noise-pollution",
+    "sox",
+    "spectral-analysis"
+  ]
 }

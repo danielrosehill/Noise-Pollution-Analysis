@@ -9,12 +9,29 @@ Stage 2 (planned): mitigation (masking, ANC, isolation) driven by the analysis.
 
 ## Skills
 
+- `install-analysis-tools`: check and install the CLI toolchain (ffmpeg, sox, aubio, uv)
+  and smoke-test it.
 - `setup-noise-workspace`: create a workspace folder for noise sources, devices, samples
   and reports.
 - `log-noise-sample`: add a recording with its metadata (device, app, audio source, room,
   mic position, conditions) and get advice on recording well.
-- `spectral-analysis`: run the analysis script on a sample and write a frequency-level
-  report into the workspace.
+- `spectral-analysis`: spectrograms (ffmpeg, sox), impact timing and hum/whine pitch
+  tracking (aubio), measurements (analysis script), then a frequency-level report.
+- `isolate-nuisance`: subtract the room background using a background take (sox
+  `noiseprof`/`noisered`), extract a band, and make before/after spectrograms.
+
+## Toolchain
+
+| Tool | Used for |
+|---|---|
+| ffmpeg | decoding, full-range log-frequency spectrograms |
+| sox (SoX_ng) | 0-1 kHz and 0-250 Hz zoom spectrograms, background subtraction, band extraction |
+| aubio | impact onset times, pitch tracking of hums and whines |
+| uv + `scripts/analyse_noise.py` | the numbers: spectrum, 1/3 octaves, tonal peaks, harmonic families, periodicity, excess over background |
+
+Versions, install names per OS, verified commands and test results, and the tools
+evaluated and rejected: `references/toolchain.md`. Friture (live spectrum) and REW
+(calibrated measurement mic) are suggested for interactive use.
 
 ## Analysis script
 
@@ -25,8 +42,7 @@ uv run scripts/analyse_noise.py recording.wav --out analysis/ [--background quie
   [--start 5 --end 95] [--calibration-offset 94.0]
 ```
 
-It writes `analysis.json` plus plots (`spectrum.png`, `thirds.png`, `spectrogram.png`,
-`spectrogram_lf.png`, `level_time.png`) and reports:
+It writes `analysis.json` plus plots and reports:
 
 - long-term average spectrum at ~0.5 Hz resolution;
 - 1/3-octave band levels, unweighted and A-weighted;
@@ -48,7 +64,7 @@ absent. Full guide: `references/recording-guide.md`.
 
 ## Requirements
 
-`uv` and `ffmpeg`.
+`ffmpeg`, `sox`, `uv`; `aubio` recommended. The `install-analysis-tools` skill installs them.
 
 ## Installation
 
